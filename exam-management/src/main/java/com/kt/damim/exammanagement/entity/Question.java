@@ -4,32 +4,38 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import java.math.BigDecimal;
+import java.util.UUID;
 
 @Entity
+@Table(name = "questions")
 @Getter @Setter @NoArgsConstructor
 public class Question {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "question_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "exam_id")
     private Exam exam;
 
-    // 1-based index (한 페이지 = 한 문항 진행용)
-    @Column(nullable = false)
-    private int idx;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "qtype", nullable = false)
+    private QuestionType qtype;
 
-    // "mcq" | "text"
-    @Column(nullable = false, length = 16)
-    private String type;
+    @Column(name = "body", nullable = false)
+    private String body;
 
-    @Column(nullable = false, length = 1000)
-    private String prompt;
+    @Column(name = "choices", columnDefinition = "jsonb")
+    private String choices;
 
-    // MCQ일 때 선택지 JSON 문자열 (예: ["A","B","C","D"])
-    @Column(length = 2000)
-    private String choicesJson;
+    @Column(name = "answer_key")
+    private String answerKey;
 
-    // 정답 (MCQ: 보기 텍스트/키, TEXT: 키워드 등)
-    @Column(length = 500)
-    private String correctAnswer;
+    @Column(name = "points", nullable = false)
+    private BigDecimal points = BigDecimal.ZERO;
+
+    @Column(name = "position", nullable = false)
+    private int position;
 }

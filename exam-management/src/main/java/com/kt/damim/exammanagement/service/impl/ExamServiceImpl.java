@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -24,14 +25,14 @@ public class ExamServiceImpl implements ExamService {
     private final ObjectMapper objectMapper;
     
     @Override
-    public QuestionDto getQuestion(Long examId, int idx) {
-        Question question = questionRepository.findByExamIdAndIdx(examId, idx)
-            .orElseThrow(() -> new IllegalArgumentException("시험 문제를 찾을 수 없습니다: examId=" + examId + ", idx=" + idx));
+    public QuestionDto getQuestion(Long examId, int position) {
+        Question question = questionRepository.findByExamIdAndPosition(examId, position)
+            .orElseThrow(() -> new IllegalArgumentException("시험 문제를 찾을 수 없습니다: examId=" + examId + ", position=" + position));
         
         List<String> choices = null;
-        if ("mcq".equals(question.getType())) {
+        if (question.getQtype().name().equals("MCQ")) {
             try {
-                choices = objectMapper.readValue(question.getChoicesJson(), new TypeReference<List<String>>() {});
+                choices = objectMapper.readValue(question.getChoices(), new TypeReference<List<String>>() {});
             } catch (JsonProcessingException e) {
                 log.error("선택지 JSON 파싱 오류", e);
                 choices = List.of();

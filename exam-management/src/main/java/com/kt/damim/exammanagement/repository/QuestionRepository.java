@@ -6,6 +6,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface QuestionRepository extends JpaRepository<Question, Long> {
-    Optional<Question> findByExamIdAndIdx(Long examId, int idx);
-    List<Question> findByExamIdOrderByIdx(Long examId);
+    Optional<Question> findByExamIdAndPosition(Long examId, int position);
+    List<Question> findByExamIdOrderByPosition(Long examId);
 }

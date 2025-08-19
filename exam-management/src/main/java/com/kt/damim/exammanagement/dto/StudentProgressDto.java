@@ -1,24 +1,26 @@
 package com.kt.damim.exammanagement.dto;
 
-import com.kt.damim.exammanagement.entity.StudentAttempt;
+import com.kt.damim.exammanagement.entity.Submission;
+import java.math.BigDecimal;
+
 
 /**
  * 교사 모니터 테이블 행
  */
 public record StudentProgressDto(
-    String studentId,
-    Integer currentIdx,
-    Integer answered,
-    Integer totalScore,
+    Long userId,
+    int currentPosition,
+    int answered,
+    BigDecimal totalScore,
     Long updatedAt
 ) {
-    public static StudentProgressDto of(StudentAttempt a) {
+    public static StudentProgressDto of(Submission s) {
         return new StudentProgressDto(
-            a.getStudentId(),
-            a.getCurrentIdx(),
-            a.getAnswered(),
-            a.getRealtimeScore(),
-            a.getUpdatedAt() == null ? null : a.getUpdatedAt().toEpochMilli()
+            s.getUserId(),
+            0, // TODO: 현재 위치 계산 로직 필요
+            0, // TODO: 답변 수 계산 로직 필요
+            s.getTotalScore(),
+            s.getSubmittedAt() == null ? null : s.getSubmittedAt().toEpochMilli()
         );
     }
 }

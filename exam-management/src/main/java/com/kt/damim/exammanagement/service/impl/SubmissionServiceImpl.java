@@ -2,19 +2,19 @@ package com.kt.damim.exammanagement.service.impl;
 
 import com.kt.damim.exammanagement.dto.SubmitAnswerRequest;
 import com.kt.damim.exammanagement.dto.SubmitAnswerResponse;
-import com.kt.damim.exammanagement.entity.Answer;
-import com.kt.damim.exammanagement.entity.Exam;
 import com.kt.damim.exammanagement.entity.Question;
-import com.kt.damim.exammanagement.entity.StudentAttempt;
-import com.kt.damim.exammanagement.repository.AnswerRepository;
+import com.kt.damim.exammanagement.entity.Submission;
+import com.kt.damim.exammanagement.entity.SubmissionAnswer;
 import com.kt.damim.exammanagement.repository.QuestionRepository;
-import com.kt.damim.exammanagement.repository.StudentAttemptRepository;
+import com.kt.damim.exammanagement.repository.SubmissionAnswerRepository;
+import com.kt.damim.exammanagement.repository.SubmissionRepository;
 import com.kt.damim.exammanagement.service.SubmissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -25,8 +25,8 @@ import java.util.List;
 public class SubmissionServiceImpl implements SubmissionService {
     
     private final QuestionRepository questionRepository;
-    private final StudentAttemptRepository studentAttemptRepository;
-    private final AnswerRepository answerRepository;
+    private final SubmissionRepository submissionRepository;
+    private final SubmissionAnswerRepository submissionAnswerRepository;
     
     @Override
     public SubmitAnswerResponse submitAnswer(Long examId, SubmitAnswerRequest req) {
@@ -39,40 +39,38 @@ public class SubmissionServiceImpl implements SubmissionService {
             throw new IllegalArgumentException("시험 ID가 일치하지 않습니다");
         }
         
-        // 학생 시도 기록 조회 (임시로 studentId를 "anonymous"로 설정)
-        StudentAttempt attempt = getOrCreateAttempt(examId, "anonymous");
+        // 학생 시도 기록 조회 (임시로 userId를 1L로 설정)
+        Submission submission = getOrCreateSubmission(examId, 1L);
         
         // 답안 저장
-        Answer answer = new Answer();
-        answer.setAttempt(attempt);
-        answer.setQuestion(question);
-        answer.setAnswer(req.answer());
-        answer.setCorrect(isCorrectAnswer(question, req.answer()));
-        answer.setSubmittedAt(Instant.now());
-        answerRepository.save(answer);
+        SubmissionAnswer answer = new SubmissionAnswer();
+        answer.setQuestionId(question.getId());
+        answer.setExamId(examId);
+        answer.setUserId(1L);
+        answer.setAnswerText(req.answerText());
+        answer.setIsCorrect(isCorrectAnswer(question, req.answerText()));
+        answer.setScore(calculateScore(question, answer.getIsCorrect()));
+        submissionAnswerRepository.save(answer);
         
-        // 시도 기록 업데이트
-        updateAttemptProgress(attempt, question.getIdx());
+        // 제출 기록 업데이트
+        updateSubmissionScore(submission);
         
-        // 다음 문제 인덱스 계산
-        Integer nextIdx = calculateNextIndex(examId, question.getIdx());
-        if (nextIdx == null) {
+        // 다음 문제 위치 계산
+        Integer nextPosition = calculateNextPosition(examId, question.getPosition());
+        if (nextPosition == null) {
             return SubmitAnswerResponse.finished();
         }
-        return SubmitAnswerResponse.next(nextIdx);
+        return SubmitAnswerResponse.next(nextPosition);
     }
     
-    private StudentAttempt getOrCreateAttempt(Long examId, String studentId) {
-        return studentAttemptRepository.findFirstByExamIdAndStudentIdOrderByStartedAtDesc(examId, studentId)
+    private Submission getOrCreateSubmission(Long examId, Long userId) {
+        return submissionRepository.findByExamIdAndUserId(examId, userId)
             .orElseGet(() -> {
-                StudentAttempt newAttempt = new StudentAttempt();
-                newAttempt.setExam(new Exam());
-                newAttempt.getExam().setId(examId);
-                newAttempt.setStudentId(studentId);
-                newAttempt.setCurrentIdx(1);
-                newAttempt.setAnswered(0);
-                newAttempt.setRealtimeScore(0);
-                return studentAttemptRepository.save(newAttempt);
+                Submission newSubmission = new Submission();
+                newSubmission.setExamId(examId);
+                newSubmission.setUserId(userId);
+                newSubmission.setTotalScore(BigDecimal.ZERO);
+                return submissionRepository.save(newSubmission);
             });
     }
     
@@ -81,32 +79,38 @@ public class SubmissionServiceImpl implements SubmissionService {
             return false;
         }
         
-        String correctAnswer = question.getCorrectAnswer();
-        if (correctAnswer == null) {
+        String answerKey = question.getAnswerKey();
+        if (answerKey == null) {
             return false;
         }
         
-        return correctAnswer.trim().equalsIgnoreCase(studentAnswer.trim());
+        return answerKey.trim().equalsIgnoreCase(studentAnswer.trim());
     }
     
-    private void updateAttemptProgress(StudentAttempt attempt, int currentIdx) {
-        attempt.setCurrentIdx(currentIdx + 1);
-        attempt.setAnswered(attempt.getAnswered() + 1);
-        attempt.setUpdatedAt(Instant.now());
-        
-        // 실시간 점수 계산 (간단한 구현)
-        List<Answer> answers = answerRepository.findByAttemptId(attempt.getId());
-        long correctCount = answers.stream().mapToLong(a -> a.getCorrect() ? 1 : 0).sum();
-        attempt.setRealtimeScore((int) (correctCount * 100 / answers.size()));
-        
-        studentAttemptRepository.save(attempt);
+    private BigDecimal calculateScore(Question question, boolean isCorrect) {
+        if (isCorrect) {
+            return question.getPoints();
+        }
+        return BigDecimal.ZERO;
     }
     
-    private Integer calculateNextIndex(Long examId, int currentIdx) {
-        List<Question> questions = questionRepository.findByExamIdOrderByIdx(examId);
-        if (currentIdx >= questions.size()) {
+    private void updateSubmissionScore(Submission submission) {
+        List<SubmissionAnswer> answers = submissionAnswerRepository.findByExamIdAndUserId(
+            submission.getExamId(), submission.getUserId());
+        
+        BigDecimal totalScore = answers.stream()
+            .map(SubmissionAnswer::getScore)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        submission.setTotalScore(totalScore);
+        submissionRepository.save(submission);
+    }
+    
+    private Integer calculateNextPosition(Long examId, int currentPosition) {
+        List<Question> questions = questionRepository.findByExamIdOrderByPosition(examId);
+        if (currentPosition >= questions.size()) {
             return null; // 모든 문제 완료
         }
-        return currentIdx + 1;
+        return currentPosition + 1;
     }
 }

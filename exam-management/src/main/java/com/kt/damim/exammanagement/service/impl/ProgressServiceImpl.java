@@ -2,12 +2,12 @@ package com.kt.damim.exammanagement.service.impl;
 
 import com.kt.damim.exammanagement.dto.StudentProgressDto;
 import com.kt.damim.exammanagement.dto.TeacherViewDto;
-import com.kt.damim.exammanagement.entity.Answer;
 import com.kt.damim.exammanagement.entity.Question;
-import com.kt.damim.exammanagement.entity.StudentAttempt;
-import com.kt.damim.exammanagement.repository.AnswerRepository;
+import com.kt.damim.exammanagement.entity.Submission;
+import com.kt.damim.exammanagement.entity.SubmissionAnswer;
 import com.kt.damim.exammanagement.repository.QuestionRepository;
-import com.kt.damim.exammanagement.repository.StudentAttemptRepository;
+import com.kt.damim.exammanagement.repository.SubmissionAnswerRepository;
+import com.kt.damim.exammanagement.repository.SubmissionRepository;
 import com.kt.damim.exammanagement.service.ProgressService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,47 +23,61 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ProgressServiceImpl implements ProgressService {
     
-    private final StudentAttemptRepository studentAttemptRepository;
-    private final AnswerRepository answerRepository;
+    private final SubmissionRepository submissionRepository;
+    private final SubmissionAnswerRepository submissionAnswerRepository;
     private final QuestionRepository questionRepository;
     
     @Override
     public List<StudentProgressDto> getProgress(Long examId, Long since) {
-        List<StudentAttempt> attempts = studentAttemptRepository.findByExamId(examId);
+        List<Submission> submissions = submissionRepository.findByExamId(examId);
         
-        return attempts.stream()
-            .filter(attempt -> since == null || attempt.getUpdatedAt().toEpochMilli() > since)
-            .map(StudentProgressDto::of)
+        return submissions.stream()
+            .filter(submission -> since == null || submission.getSubmittedAt().toEpochMilli() > since)
+            .map(this::convertToStudentProgressDto)
             .collect(Collectors.toList());
     }
     
     @Override
-    public TeacherViewDto getStudentDetail(Long examId, String studentId) {
-        StudentAttempt attempt = studentAttemptRepository.findFirstByExamIdAndStudentIdOrderByStartedAtDesc(examId, studentId)
-            .orElseThrow(() -> new IllegalArgumentException("학생 시도 기록을 찾을 수 없습니다: " + studentId));
+    public TeacherViewDto getStudentDetail(Long examId, Long userId) {
+        Submission submission = submissionRepository.findByExamIdAndUserId(examId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("학생 제출 기록을 찾을 수 없습니다: " + userId));
         
-        List<Answer> answers = answerRepository.findByAttemptId(attempt.getId());
+        List<SubmissionAnswer> answers = submissionAnswerRepository.findByExamIdAndUserId(examId, userId);
         List<TeacherViewDto.MistakeItem> mistakes = answers.stream()
-            .filter(answer -> !answer.getCorrect())
+            .filter(answer -> !answer.getIsCorrect())
             .map(this::convertToMistakeItem)
             .collect(Collectors.toList());
         
         return new TeacherViewDto(
-            attempt.getStudentId(),
-            attempt.getCurrentIdx(),
-            attempt.getAnswered(),
-            attempt.getRealtimeScore(),
+            submission.getUserId(),
+            0, // TODO: 현재 위치 계산 로직 필요
+            0, // TODO: 답변 수 계산 로직 필요
+            submission.getTotalScore(),
             mistakes
         );
     }
     
-    private TeacherViewDto.MistakeItem convertToMistakeItem(Answer answer) {
-        Question question = answer.getQuestion();
+    private StudentProgressDto convertToStudentProgressDto(Submission submission) {
+        return new StudentProgressDto(
+            submission.getUserId(),
+            0, // TODO: 현재 위치 계산 로직 필요
+            0, // TODO: 답변 수 계산 로직 필요
+            submission.getTotalScore(),
+            submission.getSubmittedAt() == null ? null : submission.getSubmittedAt().toEpochMilli()
+        );
+    }
+    
+    private TeacherViewDto.MistakeItem convertToMistakeItem(SubmissionAnswer answer) {
+        Question question = questionRepository.findById(answer.getQuestionId()).orElse(null);
+        if (question == null) {
+            return new TeacherViewDto.MistakeItem(0, 0L, "", answer.getAnswerText());
+        }
+        
         return new TeacherViewDto.MistakeItem(
-            question.getIdx(),
+            question.getPosition(),
             question.getId(),
-            question.getCorrectAnswer(),
-            answer.getAnswer()
+            question.getAnswerKey(),
+            answer.getAnswerText()
         );
     }
 }

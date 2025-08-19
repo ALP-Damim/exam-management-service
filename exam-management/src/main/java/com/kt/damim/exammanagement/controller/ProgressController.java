@@ -36,7 +36,7 @@ public class ProgressController {
     @GetMapping("/{examId}/students/{studentId}")
     public TeacherViewDto getStudentDetail(
         @PathVariable Long examId,
-        @PathVariable String studentId
+        @PathVariable Long studentId
     ) {
         return progressService.getStudentDetail(examId, studentId);
     }

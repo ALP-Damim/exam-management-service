@@ -6,18 +6,28 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import java.time.Instant;
 
+
 @Entity
+@Table(name = "exams")
 @Getter @Setter @NoArgsConstructor
 public class Exam {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "exam_id")
     private Long id;
 
-    @Column(nullable = false)
-    private String title;
+    @Column(name = "class_id")
+    private Long classId;
 
-    // "하/중/상" 등 난이도 레이블
-    @Column(nullable = false)
-    private String level;
+    @Column(name = "name", nullable = false)
+    private String name;
 
-    private Instant scheduledAt;
+    @Column(name = "difficulty")
+    private String difficulty;
+
+    @Column(name = "created_by")
+    private Long createdBy;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt = Instant.now();
 }
