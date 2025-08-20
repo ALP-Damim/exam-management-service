@@ -5,15 +5,3 @@
 ### (1) 특정 문항 조회: GET /api/exams/{examId}/questions/{idx}
 GET {{host}}/api/exams/{{examId}}/questions/1
 Accept: application/json
-
-### (2) 정답 제출: POST /api/exams/{examId}/answers
-# SubmitAnswerRequest 필드명은 프로젝트 DTO에 맞춰 조정하세요.
-# (스키마에 맞춰 userId, questionId, answerText로 예시)
-POST {{host}}/api/exams/{{examId}}/answers
-Content-Type: application/json
-Accept: application/json
-
-{
-  "questionId": 1002,
-  "answerText": "서울"
-}
