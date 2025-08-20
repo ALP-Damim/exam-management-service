@@ -17,11 +17,3 @@ Accept: application/json
   "questionId": 1002,
   "answerText": "서울"
 }
-
-### (3) 진행 현황: GET /api/exams/{examId}/progress
-GET {{host}}/api/exams/{{examId}}/progress
-Accept: application/json
-
-### (4) 특정 유저 상세(컨트롤러 경로명은 students지만 실제론 user_id)
-GET {{host}}/api/exams/{{examId}}/students/{{userId}}
-Accept: application/json
